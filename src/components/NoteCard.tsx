@@ -25,7 +25,7 @@ export default function NoteCard({ note, onClick, scale, isPreview = false }: No
       onClick={handleClick}
     >
       <div
-        className="relative w-6 h-6 p-0.5 shadow-sm border-0 transition-all duration-200 hover:shadow-md group-hover:scale-125"
+        className="relative w-8 p-0.5 shadow-sm border-0 transition-all duration-200 hover:shadow-md group-hover:scale-125"
         style={{
           backgroundColor: note.color || '#fff3a0',
           fontFamily: 'Comic Sans MS, cursive, sans-serif',
@@ -34,13 +34,13 @@ export default function NoteCard({ note, onClick, scale, isPreview = false }: No
         }}
       >
         {/* To: label */}
-        <div className="text-gray-600 font-normal leading-none" style={{ fontSize: '4px' }}>
+        <div className="text-gray-600 font-normal leading-none whitespace-nowrap overflow-hidden text-ellipsis mb-0.5" style={{ fontSize: '4px' }}>
           To: {note.sent_to}
         </div>
         
         {/* Message content */}
-        <div className="text-gray-800 leading-tight font-normal overflow-hidden" style={{ fontSize: '5px', maxHeight: '16px' }}>
-          {note.message}
+        <div className="text-gray-800 leading-tight font-normal break-words" style={{ fontSize: '3px', lineHeight: '1.2' }}>
+          {note.message.length > 150 ? `${note.message.substring(0, 150)}...` : note.message}
         </div>
       </div>
     </div>
