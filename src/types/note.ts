@@ -5,6 +5,7 @@ export interface Note {
   message: string;
   x: number;
   y: number;
+  color?: string;
 }
 
 export interface CreateNoteData {
@@ -12,6 +13,7 @@ export interface CreateNoteData {
   message: string;
   x: number;
   y: number;
+  color?: string;
 }
 
 export interface NotePosition {

@@ -24,7 +24,14 @@ export function useSupabaseRealtime() {
         { event: 'INSERT', schema: 'public', table: 'notes' },
         (payload) => {
           const newNote = payload.new as Note;
-          setNotes(prev => [newNote, ...prev]);
+          // Only add if not already in local state (prevent duplicates)
+          setNotes(prev => {
+            const exists = prev.some(note => note.id === newNote.id);
+            if (!exists) {
+              return [newNote, ...prev];
+            }
+            return prev;
+          });
         }
       )
       .on('postgres_changes',
@@ -42,7 +49,20 @@ export function useSupabaseRealtime() {
   }, []);
 
   const sendNote = async (data: CreateNoteData) => {
-    await createNote(data);
+    try {
+      // Create the note in the database
+      const newNote = await createNote(data);
+      
+      if (newNote) {
+        // Update local state immediately for instant feedback
+        setNotes(prev => [newNote, ...prev]);
+      }
+      
+      return newNote;
+    } catch (error) {
+      console.error('Error creating note:', error);
+      throw error;
+    }
   };
 
   return {

@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
     
+    // Basic field validation - detailed validation is handled in createNote
     if (!data.message || !data.sent_to || typeof data.x !== 'number' || typeof data.y !== 'number') {
       return NextResponse.json({ error: 'Missing required fields: message, sent_to, x, y' }, { status: 400 });
     }
