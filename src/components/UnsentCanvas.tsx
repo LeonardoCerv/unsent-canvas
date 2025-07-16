@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect } from 'react';
 import Canvas from './Canvas';
 import CreateNoteModal from './CreateNoteModal';
 import NoteCard from './NoteCard';
-import DebugPanel from './DebugPanel';
 import SetupGuide from './SetupGuide';
 import { useSupabaseRealtime } from '@/hooks/useSupabaseRealtime';
 import { Note, CreateNoteData } from '@/types/note';
@@ -119,8 +118,6 @@ export default function UnsentCanvas() {
         </div>
       </div>
       
-      {/* Debug panel */}
-      <DebugPanel />
     </div>
   );
 }
