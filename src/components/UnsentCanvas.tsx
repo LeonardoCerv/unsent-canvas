@@ -5,11 +5,12 @@ import Canvas from './Canvas';
 import CreateNoteModal from './CreateNoteModal';
 import NoteCard from './NoteCard';
 import SetupGuide from './SetupGuide';
-import { useSupabaseRealtime } from '@/hooks/useSupabaseRealtime';
+import { useRealtimeCanvas } from '@/hooks/useRealtimeCanvas';
 import { Note, CreateNoteData } from '@/types/note';
+import { getCooldownStatus } from '@/lib/clientCooldown';
 
 export default function UnsentCanvas() {
-  const { notes, loading, sendNote } = useSupabaseRealtime();
+  const { notes, loading, sendNote, updateCursor, userId } = useRealtimeCanvas();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalPosition, setModalPosition] = useState({ x: 0, y: 0 });
   const [showSetupGuide, setShowSetupGuide] = useState(false);
@@ -29,6 +30,13 @@ export default function UnsentCanvas() {
   }, []);
 
   const handleCanvasClick = useCallback((x: number, y: number) => {
+    // Check if user is on cooldown before showing modal
+    const cooldownStatus = getCooldownStatus();
+    if (cooldownStatus.isInCooldown) {
+      // Don't show modal if user is on cooldown
+      return;
+    }
+    
     setModalPosition({ x, y });
     setIsModalOpen(true);
   }, []);
@@ -42,6 +50,7 @@ export default function UnsentCanvas() {
       console.log('Creating note with data:', data);
       const result = await sendNote(data);
       console.log('Note created successfully:', result);
+      setIsModalOpen(false);
     } catch (error) {
       console.error('Failed to create note:', error);
       throw error;
@@ -65,6 +74,7 @@ export default function UnsentCanvas() {
         onNoteClick={handleNoteClick}
         onCanvasClick={handleCanvasClick}
         loading={loading}
+        updateCursor={updateCursor}
       />
       
       <CreateNoteModal
@@ -73,6 +83,7 @@ export default function UnsentCanvas() {
         onSubmit={handleCreateNote}
         x={modalPosition.x}
         y={modalPosition.y}
+        userId={userId}
       />
       
       {/* Note preview overlay using the same NoteCard component */}

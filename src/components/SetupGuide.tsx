@@ -47,7 +47,7 @@ export default function SetupGuide() {
               onClick={() => window.location.reload()} 
               className="w-full"
             >
-              I've completed the setup - Refresh Page
+              I&apos;ve completed the setup - Refresh Page
             </Button>
           </div>
         </div>

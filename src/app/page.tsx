@@ -1,9 +1,12 @@
 import UnsentCanvas from '@/components/UnsentCanvas';
+import { CanvasProvider } from '@/contexts/CanvasContext';
 
 export default function Home() {
   return (
-    <div className="w-full h-screen overflow-hidden">
-      <UnsentCanvas />
-    </div>
+    <CanvasProvider>
+      <div className="w-full h-screen overflow-hidden">
+        <UnsentCanvas />
+      </div>
+    </CanvasProvider>
   );
 }

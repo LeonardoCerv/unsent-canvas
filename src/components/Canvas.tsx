@@ -3,12 +3,17 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Note } from '@/types/note';
 import NoteCard from './NoteCard';
+import UserCursor from './UserCursor';
+import CooldownTimer from './CooldownTimer';
+import ConnectionStatus from './ConnectionStatus';
+import { useCanvas } from '@/contexts/CanvasContext';
 
 interface CanvasProps {
   notes: Note[];
   onNoteClick: (note: Note) => void;
   onCanvasClick: (x: number, y: number) => void;
   loading?: boolean;
+  updateCursor?: (x: number, y: number) => void;
 }
 
 interface ViewState {
@@ -18,7 +23,8 @@ interface ViewState {
   browserZoom: number;
 }
 
-export default function Canvas({ notes, onNoteClick, onCanvasClick, loading = false }: CanvasProps) {
+export default function Canvas({ notes, onNoteClick, onCanvasClick, loading = false, updateCursor }: CanvasProps) {
+  const { state } = useCanvas();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const scalableContentRef = useRef<HTMLDivElement>(null);
@@ -32,7 +38,7 @@ export default function Canvas({ notes, onNoteClick, onCanvasClick, loading = fa
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
   const [mouseWorldPos, setMouseWorldPos] = useState({ x: 0, y: 0 });
-  const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
+
   const [currentMousePos, setCurrentMousePos] = useState({ x: 0, y: 0 });
 
   const MIN_ZOOM = 0.5;
@@ -169,8 +175,12 @@ export default function Canvas({ notes, onNoteClick, onCanvasClick, loading = fa
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const worldPos = screenToWorld(e.clientX, e.clientY);
     setMouseWorldPos(worldPos);
-    setLastMousePos({ x: e.clientX, y: e.clientY });
     setCurrentMousePos({ x: e.clientX, y: e.clientY });
+    
+    // Update cursor position for real-time tracking
+    if (updateCursor && !isDragging) {
+      updateCursor(worldPos.x, worldPos.y);
+    }
     
     if (!isDragging) return;
     
@@ -184,7 +194,7 @@ export default function Canvas({ notes, onNoteClick, onCanvasClick, loading = fa
     }));
     
     setLastPanPoint({ x: e.clientX, y: e.clientY });
-  }, [isDragging, lastPanPoint, screenToWorld, viewState.browserZoom]);
+  }, [isDragging, lastPanPoint, screenToWorld, viewState.browserZoom, updateCursor]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     if (!isDragging) return;
@@ -244,7 +254,7 @@ export default function Canvas({ notes, onNoteClick, onCanvasClick, loading = fa
         offsetY: prev.offsetY - deltaY / (prev.zoom * prev.browserZoom)
       }));
     }
-  }, [viewState, zoomToCursor]);
+  }, [zoomToCursor]);
 
   // Disable pinch-to-zoom (trackpad/touch) - do nothing on touch events
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -376,9 +386,38 @@ export default function Canvas({ notes, onNoteClick, onCanvasClick, loading = fa
             );
           })}
         </div>
+        
+        {/* User Cursors */}
+        <div className="absolute inset-0 pointer-events-none z-30">
+          {Array.from(state.users.entries()).map(([userId, user]) => {
+            const screenPos = worldToScreen(user.cursor.x, user.cursor.y);
+            return (
+              <UserCursor
+                key={userId}
+                userId={userId}
+                x={screenPos.x}
+                y={screenPos.y}
+                color={user.color}
+                lastUpdate={user.cursor.lastUpdate}
+              />
+            );
+          })}
+        </div>
       </div>
       
       {/* Fixed UI Elements - these don't scale with browser zoom */}
+      {/* Cooldown Timer */}
+      {state.cooldownEndTime && (
+        <CooldownTimer
+          endTime={state.cooldownEndTime}
+          onComplete={() => {
+            // Will be handled by the parent component
+          }}
+        />
+      )}
+      
+      {/* Connection Status */}
+      <ConnectionStatus />
       {/* Position indicator */}
       <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg pointer-events-none z-50">
         <div className="text-sm text-gray-600">

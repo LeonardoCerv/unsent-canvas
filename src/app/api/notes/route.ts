@@ -41,6 +41,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields: message, sent_to, x, y' }, { status: 400 });
     }
 
+    // Cooldown and rate limiting is now handled entirely on the client side
+    // This reduces database calls to Supabase
+    
     const note = await createNote(data);
     
     if (!note) {

@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { createNote, getNotes, testConnection } from '@/lib/database';
+import { Note } from '@/types/note';
 
 export default function DebugPanel() {
   const [isVisible, setIsVisible] = useState(false);
-  const [notes, setNotes] = useState<any[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'success' | 'failed'>('unknown');
 

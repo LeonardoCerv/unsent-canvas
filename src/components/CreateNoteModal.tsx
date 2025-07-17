@@ -12,9 +12,10 @@ import { CreateNoteData } from '@/types/note';
 interface CreateNoteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: CreateNoteData) => void;
+  onSubmit: (data: CreateNoteData & { userId?: string }) => void;
   x: number;
   y: number;
+  userId?: string;
 }
 
 const NOTE_COLORS = [
@@ -30,7 +31,7 @@ const NOTE_COLORS = [
   '#d1fae5', // Emerald
 ];
 
-export default function CreateNoteModal({ isOpen, onClose, onSubmit, x, y }: CreateNoteModalProps) {
+export default function CreateNoteModal({ isOpen, onClose, onSubmit, x, y, userId }: CreateNoteModalProps) {
   const [message, setMessage] = useState('');
   const [sentTo, setSentTo] = useState('');
   const [selectedColor, setSelectedColor] = useState(NOTE_COLORS[0]);
@@ -80,7 +81,8 @@ export default function CreateNoteModal({ isOpen, onClose, onSubmit, x, y }: Cre
           sent_to: sentToValidation.sanitized!,
           x,
           y,
-          color: selectedColor
+          color: selectedColor,
+          userId
         };
         
         console.log('Submitting note data:', noteData);
@@ -93,10 +95,10 @@ export default function CreateNoteModal({ isOpen, onClose, onSubmit, x, y }: Cre
         setMessageErrors([]);
         setSentToErrors([]);
         onClose();
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error creating note:', error);
         // Show error message to user
-        if (error.message?.includes('check constraint')) {
+        if (error instanceof Error && error.message?.includes('check constraint')) {
           setSentToErrors(['Recipient name is too long']);
         } else {
           setSentToErrors(['Failed to create note. Please try again.']);

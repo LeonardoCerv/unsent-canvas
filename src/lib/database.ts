@@ -1,13 +1,13 @@
 import { supabase } from './supabase';
 import { CreateNoteData, Note } from '@/types/note';
-import { validateSentTo, validateMessage, validateCoordinates, LIMITS } from './validation';
+import { validateSentTo, validateMessage, validateCoordinates } from './validation';
 
 export async function testConnection(): Promise<boolean> {
   try {
     console.log('Testing Supabase connection...');
     
     // Test basic connection
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('notes')
       .select('count')
       .limit(1);
