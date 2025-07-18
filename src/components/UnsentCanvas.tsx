@@ -9,7 +9,7 @@ import SetupGuide from './SetupGuide';
 import { useRealtimeCanvas } from '@/hooks/useRealtimeCanvas';
 import { Note, CreateNoteData } from '@/types/note';
 import { getCooldownStatus } from '@/lib/clientCooldown';
-import { moderateContent } from '@/lib/contentModeration';
+
 import { hasUserReportedNote, recordUserReport } from '@/lib/reportSystem';
 import NoteCard from './NoteCard';
 import { AlertTriangle } from 'lucide-react';
@@ -55,13 +55,6 @@ export default function UnsentCanvas() {
   const handleCreateNote = useCallback(async (data: CreateNoteData) => {
     try {
       console.log('Creating note with data:', data);
-      
-      // Apply content moderation before sending
-      const moderationResult = moderateContent(data.message);
-      
-      if (!moderationResult.isAllowed) {
-        throw new Error(`Message blocked: ${moderationResult.reason}`);
-      }
       
       const result = await sendNote(data);
       console.log('Note created successfully:', result);
