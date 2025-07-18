@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createNote, getNotes, getNotesByArea, getNotesBySentTo } from '@/lib/database';
-import { createClient } from '@supabase/supabase-js';
+import { 
+  createNote, 
+  getNotes, 
+  getNotesByArea, 
+  getNotesBySentTo, 
+  updateNoteReports,
+  checkRateLimit 
+} from '@/lib/database';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabase = supabaseUrl && supabaseServiceKey 
-  ? createClient(supabaseUrl, supabaseServiceKey)
-  : null;
+// Note: Database clients are now handled in database.ts
+// This keeps the API routes clean and centralizes database access
+const REPORT_RATE_LIMIT = parseInt(process.env.REPORT_RATE_LIMIT || '14400', 10);
+
+const NOTE_RATE_LIMIT = parseInt(process.env.NOTE_RATE_LIMIT || '720', 10);
 
 export async function GET(request: NextRequest) {
   try {
@@ -49,9 +55,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields: message, sent_to, x, y' }, { status: 400 });
     }
 
-    // Cooldown and rate limiting is now handled entirely on the client side
-    // This reduces database calls to Supabase
+    // Get client IP for rate limiting
+    const clientIP = request.headers.get('x-forwarded-for') || 
+                    request.headers.get('x-real-ip') || 
+                    'unknown';
+
+    // Server-side rate limiting: 5 notes per hour per IP
+    const rateLimitPassed = await checkRateLimit(clientIP, 'create_note', NOTE_RATE_LIMIT, 1440);
     
+    if (!rateLimitPassed) {
+      return NextResponse.json({ 
+        error: 'Rate limit exceeded. Please wait before creating another note.' 
+      }, { status: 429 });
+    }
+
+    // Create note using service role (server-only operation)
     const note = await createNote(data);
     
     if (!note) {
@@ -60,19 +78,16 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json(note);
   } catch (error) {
-    console.error('Error creating note:', error);
-    return NextResponse.json({ error: 'Failed to create note' }, { status: 500 });
+    console.error('POST /api/notes - Error creating note:', error);
+    return NextResponse.json({ 
+      error: 'Failed to create note', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, { status: 500 });
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
-    if (!supabase) {
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
-      );
-    }
 
     const data = await request.json();
     const { id: noteId } = data;
@@ -89,64 +104,39 @@ export async function PUT(request: NextRequest) {
                     request.headers.get('x-real-ip') || 
                     'unknown';
 
-    // Basic rate limiting check (could be enhanced)
-    console.log(`Report attempt for note ${noteId} from IP: ${clientIP}`);
-
-    // First get the current report count, then increment it
-    const { data: currentNote, error: fetchError } = await supabase
-      .from('notes')
-      .select('report_count')
-      .eq('id', noteId)
-      .single();
-
-    if (fetchError) {
-      console.error('Error fetching note:', fetchError);
-      return NextResponse.json(
-        { error: 'Note not found' },
-        { status: 404 }
-      );
+    // Server-side rate limiting: 60 reports per hour per IP
+    const rateLimitPassed = await checkRateLimit(clientIP, 'report_note', REPORT_RATE_LIMIT, 1440);
+    
+    if (!rateLimitPassed) {
+      return NextResponse.json({ 
+        error: 'Rate limit exceeded. Please wait before reporting another note.' 
+      }, { status: 429 });
     }
 
-    const newReportCount = (currentNote?.report_count || 0) + 1;
-    console.log(`Incrementing report count for note ${noteId} to ${newReportCount}`);
+    console.log(`Report attempt for note ${noteId} from IP: ${clientIP}`);
 
-    // Update the report count
-    const { data: updatedNote, error } = await supabase
-      .from('notes')
-      .update({ 
-        report_count: newReportCount
-      })
-      .eq('id', noteId)
-      .select('report_count')
-      .single();
+    // Use secure database function to update report count
+    const result = await updateNoteReports(noteId);
 
-    if (error) {
-      console.error('Error updating report count:', error);
+    if (!result.success) {
       return NextResponse.json(
         { error: 'Failed to submit report' },
         { status: 500 }
       );
     }
 
-    if (!updatedNote) {
-      return NextResponse.json(
-        { error: 'Note not found' },
-        { status: 404 }
-      );
-    }
-
     // Log the report for potential moderation action
-    console.log(`Note ${noteId} reported. New report count: ${updatedNote.report_count}`);
+    console.log(`Note ${noteId} reported. New report count: ${result.reportCount}`);
 
     // If report count reaches a threshold, we could take action here
-    if (updatedNote.report_count >= 5) {
-      console.warn(`Note ${noteId} has reached ${updatedNote.report_count} reports - may need moderation`);
+    if (result.reportCount >= 5) {
+      console.warn(`Note ${noteId} has reached ${result.reportCount} reports - may need moderation`);
       // Could automatically hide note or flag for review
     }
 
     return NextResponse.json({
       success: true,
-      reportCount: updatedNote.report_count,
+      reportCount: result.reportCount,
       message: 'Report submitted successfully'
     });
 

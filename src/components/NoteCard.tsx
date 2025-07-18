@@ -26,6 +26,15 @@ export default function NoteCard({ note, onClick, scale, isPreview = false }: No
         minHeight: '32px', // Minimum height for consistent click area
       }}
       onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      aria-label={`Note to ${note.sent_to}: ${note.message.substring(0, 50)}${note.message.length > 50 ? '...' : ''}`}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleClick(e as unknown as React.MouseEvent);
+        }
+      }}
     >
       <div
         className="relative w-full p-0.5 shadow-sm border-0 transition-all duration-500 hover:shadow-md group-hover:scale-101"

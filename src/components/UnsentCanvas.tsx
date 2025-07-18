@@ -4,8 +4,6 @@ import { useState, useCallback, useEffect } from 'react';
 import Canvas from './Canvas';
 import CreateNoteModal from './CreateNoteModal';
 
-import SetupGuide from './SetupGuide';
-
 import { useRealtimeCanvas } from '@/hooks/useRealtimeCanvas';
 import { Note, CreateNoteData } from '@/types/note';
 import { getCooldownStatus } from '@/lib/clientCooldown';
@@ -16,24 +14,11 @@ import { AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function UnsentCanvas() {
-  const { notes, loading, sendNote, updateCursor, userId } = useRealtimeCanvas();
+  const { notes, loading, sendNote } = useRealtimeCanvas();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalPosition, setModalPosition] = useState({ x: 0, y: 0 });
   const [showSetupGuide, setShowSetupGuide] = useState(false);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
-
-  // Check if environment variables are set
-  useEffect(() => {
-    const hasSupabaseConfig = 
-      process.env.NEXT_PUBLIC_SUPABASE_URL && 
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
-      process.env.NEXT_PUBLIC_SUPABASE_URL !== 'your_supabase_url' &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== 'your_supabase_anon_key';
-    
-    if (!hasSupabaseConfig) {
-      setShowSetupGuide(true);
-    }
-  }, []);
 
   const handleCanvasClick = useCallback((x: number, y: number) => {
     // Check if user is on cooldown before showing modal
@@ -75,7 +60,7 @@ export default function UnsentCanvas() {
     try {
       // Submit report to backend
       const response = await fetch(`/api/notes`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -85,8 +70,7 @@ export default function UnsentCanvas() {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        toast.success(`Report submitted successfully. This note now has ${data.reportCount} reports.`);
+        toast.success(`Report submitted successfully. Thank you!`);
         setSelectedNote(null); // Close preview after reporting
         
         // Record that user reported this note
@@ -114,14 +98,12 @@ export default function UnsentCanvas() {
 
   return (
     <div className="relative w-full h-full">
-      {showSetupGuide && <SetupGuide />}
       
       <Canvas
         notes={notes}
         onNoteClick={handleNoteClick}
         onCanvasClick={handleCanvasClick}
         loading={loading}
-        updateCursor={updateCursor}
       />
       
       <CreateNoteModal
@@ -130,7 +112,6 @@ export default function UnsentCanvas() {
         onSubmit={handleCreateNote}
         x={modalPosition.x}
         y={modalPosition.y}
-        userId={userId}
       />
       
       {/* Note preview overlay using the same NoteCard component */}
@@ -168,7 +149,7 @@ export default function UnsentCanvas() {
       )}
       
       {/* Instructions overlay */}
-      {notes.length === 0 && !loading && !showSetupGuide && (
+      {notes.length === 0 && !loading && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="bg-white/90 backdrop-blur-sm rounded-lg p-8 shadow-lg text-center max-w-md">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">
@@ -185,8 +166,6 @@ export default function UnsentCanvas() {
           </div>
         </div>
       )}
-      
-
       
     </div>
   );

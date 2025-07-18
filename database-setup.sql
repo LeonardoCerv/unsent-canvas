@@ -1,12 +1,22 @@
--- Complete Database Setup for Unsent Canvas
--- Run this script in Supabase SQL Editor to set up the entire database
--- This script handles: table creation, constraints, indexes, RLS policies, and realtime
+-- =============================================================================
+-- SECURE DATABASE SETUP for Unsent Canvas
+-- =============================================================================
+-- This script sets up the complete database with Row Level Security (RLS)
+-- Run this script in Supabase SQL Editor to set up the entire secure database
+-- 
+-- Security Model:
+-- ✓ Public read access (anyone can view notes)
+-- ✓ Server-only write access (only service role can create/update/delete)
+-- ✓ Rate limiting infrastructure
+-- ✓ Admin moderation functions
+-- =============================================================================
 
 -- =============================================================================
 -- 1. DROP EXISTING TABLE AND CONSTRAINTS (if running as reset)
 -- =============================================================================
 -- Uncomment the next line if you want to completely reset the database
 -- DROP TABLE IF EXISTS public.notes CASCADE;
+-- DROP TABLE IF EXISTS public.rate_limits CASCADE;
 
 -- =============================================================================
 -- 2. CREATE NOTES TABLE
@@ -87,30 +97,165 @@ DROP POLICY IF EXISTS "Allow anonymous read access" ON public.notes;
 DROP POLICY IF EXISTS "Allow anonymous insert access" ON public.notes;
 DROP POLICY IF EXISTS "Allow anonymous delete access" ON public.notes;
 DROP POLICY IF EXISTS "Allow anonymous update access" ON public.notes;
-
--- Create policies for anonymous public access
--- These policies allow anyone to read, create, delete, and update notes without authentication
--- This enables a completely anonymous experience where users don't need to sign up
-CREATE POLICY "Allow anonymous read access" ON public.notes 
-    FOR SELECT USING (true);
-
-CREATE POLICY "Allow anonymous insert access" ON public.notes 
-    FOR INSERT WITH CHECK (true);
-
-CREATE POLICY "Allow anonymous delete access" ON public.notes 
-    FOR DELETE USING (true);
-
-CREATE POLICY "Allow anonymous update access" ON public.notes 
-    FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Public read access" ON public.notes;
+DROP POLICY IF EXISTS "Server only insert access" ON public.notes;
+DROP POLICY IF EXISTS "Server only update access" ON public.notes;
+DROP POLICY IF EXISTS "Server only delete access" ON public.notes;
 
 -- =============================================================================
--- 7. ENABLE REALTIME
+-- 7. CREATE SECURE POLICIES
+-- =============================================================================
+
+-- Policy 1: Allow public read access (anyone can view notes)
+CREATE POLICY "Public read access" ON public.notes
+    FOR SELECT 
+    USING (true);
+
+-- Policy 2: Only allow inserts via service role (server only)
+CREATE POLICY "Server only insert access" ON public.notes
+    FOR INSERT 
+    WITH CHECK (auth.role() = 'service_role');
+
+-- Policy 3: Only allow updates via service role (server only)
+CREATE POLICY "Server only update access" ON public.notes
+    FOR UPDATE 
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
+
+-- Policy 4: Only allow deletes via service role (server only)
+CREATE POLICY "Server only delete access" ON public.notes
+    FOR DELETE 
+    USING (auth.role() = 'service_role');
+
+-- =============================================================================
+-- 8. CREATE RATE LIMITING INFRASTRUCTURE
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS public.rate_limits (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    ip_address INET NOT NULL,
+    action TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+-- Enable RLS on rate_limits table
+ALTER TABLE public.rate_limits ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing rate limit policies
+DROP POLICY IF EXISTS "Server only rate limit access" ON public.rate_limits;
+
+-- Only server can manage rate limits
+CREATE POLICY "Server only rate limit access" ON public.rate_limits
+    FOR ALL 
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
+
+-- Index for rate limiting queries
+CREATE INDEX IF NOT EXISTS rate_limits_ip_action_idx 
+ON public.rate_limits(ip_address, action, expires_at);
+
+-- =============================================================================
+-- 9. CREATE ADMIN FUNCTIONS
+-- =============================================================================
+
+-- Function to get server stats (only accessible to service role)
+CREATE OR REPLACE FUNCTION get_server_stats()
+RETURNS TABLE (
+    total_notes bigint,
+    notes_today bigint,
+    reports_pending bigint
+) 
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    -- Only allow service role to access this function
+    IF auth.role() != 'service_role' THEN
+        RAISE EXCEPTION 'Access denied: Service role required';
+    END IF;
+    
+    RETURN QUERY
+    SELECT 
+        COUNT(*) as total_notes,
+        COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE) as notes_today,
+        COUNT(*) FILTER (WHERE report_count >= 5) as reports_pending
+    FROM public.notes;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to moderate notes (only accessible to service role)
+CREATE OR REPLACE FUNCTION moderate_note(note_id UUID, action TEXT)
+RETURNS BOOLEAN
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    -- Only allow service role to access this function
+    IF auth.role() != 'service_role' THEN
+        RAISE EXCEPTION 'Access denied: Service role required';
+    END IF;
+    
+    IF action = 'delete' THEN
+        DELETE FROM public.notes WHERE id = note_id;
+        RETURN TRUE;
+    ELSIF action = 'reset_reports' THEN
+        UPDATE public.notes SET report_count = 0 WHERE id = note_id;
+        RETURN TRUE;
+    ELSE
+        RAISE EXCEPTION 'Invalid action: %', action;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to check rate limits
+CREATE OR REPLACE FUNCTION check_rate_limit(client_ip INET, limit_action TEXT, limit_count INTEGER, limit_window INTERVAL)
+RETURNS BOOLEAN
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    current_count INTEGER;
+    window_start TIMESTAMP WITH TIME ZONE;
+BEGIN
+    -- Only allow service role to access this function
+    IF auth.role() != 'service_role' THEN
+        RAISE EXCEPTION 'Access denied: Service role required';
+    END IF;
+    
+    window_start := NOW() - limit_window;
+    
+    -- Count recent actions from this IP
+    SELECT COUNT(*) INTO current_count
+    FROM public.rate_limits
+    WHERE ip_address = client_ip
+      AND action = limit_action
+      AND created_at >= window_start;
+    
+    -- Clean up expired entries
+    DELETE FROM public.rate_limits
+    WHERE expires_at < NOW();
+    
+    -- Check if limit is exceeded
+    IF current_count >= limit_count THEN
+        RETURN FALSE;
+    END IF;
+    
+    -- Record this action
+    INSERT INTO public.rate_limits (ip_address, action, expires_at)
+    VALUES (client_ip, limit_action, NOW() + limit_window);
+    
+    RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =============================================================================
+-- 10. ENABLE REALTIME
 -- =============================================================================
 -- Enable realtime for the notes table
 ALTER PUBLICATION supabase_realtime ADD TABLE public.notes;
 
 -- =============================================================================
--- 8. VERIFICATION QUERIES
+-- 11. VERIFICATION QUERIES
 -- =============================================================================
 -- Check constraints
 SELECT 
@@ -137,16 +282,17 @@ SELECT
     permissive,
     roles,
     cmd,
-    qual
+    qual,
+    with_check
 FROM pg_policies 
-WHERE tablename = 'notes' AND schemaname = 'public'
-ORDER BY policyname;
+WHERE tablename IN ('notes', 'rate_limits') AND schemaname = 'public'
+ORDER BY tablename, policyname;
 
 -- =============================================================================
--- 9. TEST DATA (Optional - uncomment to add sample data)
+-- 12. TEST DATA (Optional - uncomment to add sample data)
 -- =============================================================================
 /*
--- Insert sample notes for testing
+-- Insert sample notes for testing (will only work if service role is active)
 INSERT INTO public.notes (sent_to, message, x, y, color) VALUES
     ('Alice', 'Hello world!', 0, 0, '#fff3a0'),
     ('Bob', 'This is a test note', 5, 3, '#fce7f3'),
@@ -160,14 +306,23 @@ SELECT id, sent_to, message, x, y, color, created_at FROM public.notes ORDER BY 
 -- =============================================================================
 -- SETUP COMPLETE
 -- =============================================================================
--- Your database is now ready for the Unsent Canvas application!
+-- Your database is now ready for the Unsent Canvas application with secure RLS!
 -- 
 -- Summary of what was created:
--- ✓ notes table with proper schema
--- ✓ Constraints for data validation (15 char sent_to, 150 char message)
--- ✓ Performance indexes for queries
--- ✓ Anonymous access policies (no authentication required)
+-- ✓ notes table with proper schema and constraints
+-- ✓ Performance indexes for efficient queries
+-- ✓ Row Level Security (RLS) enabled
+-- ✓ Public read access (anyone can view notes)
+-- ✓ Server-only write access (only service role can create/update/delete)
+-- ✓ Rate limiting infrastructure
+-- ✓ Admin moderation functions
 -- ✓ Realtime enabled for live updates
 -- ✓ Support for infinite canvas (negative coordinates)
 --
--- You can now run your Next.js application and start creating notes!
+-- IMPORTANT: Make sure your .env file contains:
+-- NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+-- NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+-- SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+-- ADMIN_API_KEY=your_secure_admin_key
+--
+-- You can now run your Next.js application securely!

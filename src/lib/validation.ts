@@ -1,4 +1,11 @@
-import DOMPurify from 'dompurify';
+// Server-safe HTML sanitization
+function sanitizeHtml(input: string): string {
+  // Simple server-side sanitization - remove HTML tags and dangerous characters
+  return input
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/[<>'"&]/g, '') // Remove dangerous characters
+    .trim();
+}
 
 // Database field limits
 export const LIMITS = {
@@ -55,7 +62,7 @@ export function validateMessage(message: string): ValidationResult {
   }
   
   // Sanitize the message
-  const sanitized = DOMPurify.sanitize(message.trim());
+  const sanitized = sanitizeHtml(message);
   
   return {
     isValid: errors.length === 0,
@@ -77,7 +84,7 @@ export function validateSentTo(sentTo: string): ValidationResult {
   }
   
   // Basic sanitization
-  const sanitized = DOMPurify.sanitize(sentTo.trim());
+  const sanitized = sanitizeHtml(sentTo);
   
   return {
     isValid: errors.length === 0,
@@ -104,5 +111,5 @@ export function validateCoordinates(x: number, y: number): ValidationResult {
 }
 
 export function sanitizeInput(input: string): string {
-  return DOMPurify.sanitize(input.trim());
+  return sanitizeHtml(input);
 }
