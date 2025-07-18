@@ -20,16 +20,33 @@ interface CreateNoteModalProps {
 }
 
 const NOTE_COLORS = [
-  '#ffffff', // White
-  '#fef3c7', // Yellow
-  '#fce7f3', // Pink
+  '#ffffff', // Pure White
+  '#f8fafc', // Ghost White
+  '#f1f5f9', // Light Silver
+  '#e2e8f0', // Silver
+  '#f3f4f6', // Platinum
+  '#fef9c3', // Light Cream
+  '#fef3c7', // Light Yellow
+  '#fde68a', // Pastel Yellow
+  '#fdf6b2', // Butter
+  '#fce7f3', // Light Pink
+  '#f9a8d4', // Pastel Pink
+  '#f5d0fe', // Lavender
+  '#f3e8ff', // Light Purple
   '#e0f2fe', // Light Blue
+  '#bae6fd', // Pastel Blue
   '#f0f9ff', // Sky Blue
-  '#ecfdf5', // Green
-  '#fef3e2', // Orange
-  '#f3e8ff', // Purple
-  '#fecaca', // Red
+  '#bbf7d0', // Light Mint
+  '#a7f3d0', // Mint
+  '#ecfdf5', // Light Green
   '#d1fae5', // Emerald
+  '#fef3e2', // Light Orange
+  '#fdba74', // Pastel Orange
+  '#fecaca', // Light Red
+  '#fca5a5', // Pastel Coral
+  '#fcd34d', // Light Gold
+  '#f0abfc', // Magenta
+  '#f5f5dc', // Beige
 ];
 
 export default function CreateNoteModal({ isOpen, onClose, onSubmit, x, y, userId }: CreateNoteModalProps) {
