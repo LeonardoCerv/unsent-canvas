@@ -1,10 +1,12 @@
 'use client';
 
 import { useCanvas } from '@/contexts/CanvasContext';
+import { useRealtimeCanvas } from '@/hooks/useRealtimeCanvas';
 
 export default function ConnectionStatus() {
   const { state } = useCanvas();
   const { connectionStatus, users } = state;
+  const { notes, loading, sendNote, updateCursor, userId } = useRealtimeCanvas();
   
   const getStatusColor = () => {
     switch (connectionStatus) {
@@ -33,19 +35,28 @@ export default function ConnectionStatus() {
   };
   
   return (
-    <div className="fixed bottom-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-3 z-50">
+    <>
+    <div className="fixed top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-2 z-50">
       <div className="flex items-center space-x-2">
-        <div className={`w-2 h-2 rounded-full ${getStatusColor()}`} />
-        <span className="text-sm font-medium text-gray-700">
-          {getStatusText()}
-        </span>
+      <div className={`w-2 h-2 rounded-full ${getStatusColor()}`} />
+      <span className="text-sm font-medium text-gray-700">
+        {getStatusText()}
+      </span>
       </div>
-      
-      {connectionStatus === 'connected' && (
-        <div className="mt-2 text-xs text-gray-500">
-          {users.size} active users
-        </div>
-      )}
     </div>
+    {/* Note count indicator */}
+      <div className="fixed top-28 left-4 bg-white/90 backdrop-blur-sm rounded-lg p-2 shadow-lg pointer-events-none z-50">
+      <div className="text-sm text-gray-600">
+        {loading ? 'Loading...' : <><span className="font-bold">{notes.length}</span> notes written!</>}
+      </div>
+      </div>
+    {connectionStatus === 'connected' && (
+      <div className="fixed top-16 left-4 bg-white/90 backdrop-blur-sm rounded-lg p-2 shadow-lg pointer-events-none z-50">
+      <div className='text-sm text-gray-600'>
+        <span className="font-bold">{users.size}</span> active users
+      </div>
+      </div>
+    )}
+    </>
   );
 }

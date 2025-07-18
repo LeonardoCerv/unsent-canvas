@@ -21,16 +21,20 @@ export default function NoteCard({ note, onClick, scale, isPreview = false }: No
       style={{
         transform: `scale(${scale})`,
         transformOrigin: 'top left',
+        width: '32px', // Ensure full width coverage
+        height: 'auto', // Auto height based on content
+        minHeight: '32px', // Minimum height for consistent click area
       }}
       onClick={handleClick}
     >
       <div
-        className="relative w-8 p-0.5 shadow-sm border-0 transition-all duration-200 hover:shadow-md group-hover:scale-125"
+        className="relative w-full p-0.5 shadow-sm border-0 transition-all duration-500 hover:shadow-md group-hover:scale-101"
         style={{
           backgroundColor: note.color || '#fff3a0',
           fontFamily: 'Comic Sans MS, cursive, sans-serif',
           filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1))',
           fontSize: '6px',
+          minHeight: '31px', // Match the minimum height
         }}
       >
         {/* To: label */}

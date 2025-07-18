@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS public.notes (
   message TEXT NOT NULL,
   x INTEGER NOT NULL, -- Grid coordinates (can be negative for infinite canvas)
   y INTEGER NOT NULL, -- Grid coordinates (can be negative for infinite canvas)
-  color TEXT DEFAULT '#fff3a0' -- Default sticky note yellow
+  color TEXT DEFAULT '#fff3a0', -- Default sticky note yellow
+  report_count INTEGER DEFAULT 0 NOT NULL -- Number of times this note has been reported
 );
 
 -- =============================================================================
@@ -57,6 +58,10 @@ ALTER TABLE public.notes
     ADD CONSTRAINT notes_message_not_empty
     CHECK (char_length(trim(message)) > 0);
 
+ALTER TABLE public.notes
+    ADD CONSTRAINT notes_report_count_positive
+    CHECK (report_count >= 0);
+
 -- =============================================================================
 -- 5. CREATE INDEXES FOR PERFORMANCE
 -- =============================================================================
@@ -64,11 +69,13 @@ ALTER TABLE public.notes
 DROP INDEX IF EXISTS notes_position_idx;
 DROP INDEX IF EXISTS notes_created_at_idx;
 DROP INDEX IF EXISTS notes_sent_to_idx;
+DROP INDEX IF EXISTS notes_report_count_idx;
 
 -- Create performance indexes
 CREATE INDEX notes_position_idx ON public.notes(x, y);
 CREATE INDEX notes_created_at_idx ON public.notes(created_at DESC);
 CREATE INDEX notes_sent_to_idx ON public.notes(sent_to);
+CREATE INDEX notes_report_count_idx ON public.notes(report_count DESC);
 
 -- =============================================================================
 -- 6. ENABLE ROW LEVEL SECURITY (RLS)
@@ -79,9 +86,10 @@ ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow anonymous read access" ON public.notes;
 DROP POLICY IF EXISTS "Allow anonymous insert access" ON public.notes;
 DROP POLICY IF EXISTS "Allow anonymous delete access" ON public.notes;
+DROP POLICY IF EXISTS "Allow anonymous update access" ON public.notes;
 
 -- Create policies for anonymous public access
--- These policies allow anyone to read, create, and delete notes without authentication
+-- These policies allow anyone to read, create, delete, and update notes without authentication
 -- This enables a completely anonymous experience where users don't need to sign up
 CREATE POLICY "Allow anonymous read access" ON public.notes 
     FOR SELECT USING (true);
@@ -91,6 +99,9 @@ CREATE POLICY "Allow anonymous insert access" ON public.notes
 
 CREATE POLICY "Allow anonymous delete access" ON public.notes 
     FOR DELETE USING (true);
+
+CREATE POLICY "Allow anonymous update access" ON public.notes 
+    FOR UPDATE USING (true);
 
 -- =============================================================================
 -- 7. ENABLE REALTIME

@@ -7,6 +7,7 @@ import UserCursor from './UserCursor';
 import CooldownTimer from './CooldownTimer';
 import ConnectionStatus from './ConnectionStatus';
 import { useCanvas } from '@/contexts/CanvasContext';
+import { RotateCcw } from 'lucide-react';
 
 interface CanvasProps {
   notes: Note[];
@@ -38,6 +39,7 @@ export default function Canvas({ notes, onNoteClick, onCanvasClick, loading = fa
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
   const [mouseWorldPos, setMouseWorldPos] = useState({ x: 0, y: 0 });
+  const [isNoteClicked, setIsNoteClicked] = useState(false);
 
   const [currentMousePos, setCurrentMousePos] = useState({ x: 0, y: 0 });
 
@@ -77,13 +79,8 @@ export default function Canvas({ notes, onNoteClick, onCanvasClick, loading = fa
 
   // Check if a click hits a note
   const isClickOnNote = useCallback((worldX: number, worldY: number) => {
-    const noteSize = 24 / GRID_SIZE;
-    
-    return notes.some(note => {
-      return worldX >= note.x && worldX <= note.x + noteSize &&
-             worldY >= note.y && worldY <= note.y + noteSize;
-    });
-  }, [notes]);
+    return isNoteClicked;
+  }, [isNoteClicked]);
 
   // Draw canvas
   const draw = useCallback(() => {
@@ -375,6 +372,9 @@ export default function Canvas({ notes, onNoteClick, onCanvasClick, loading = fa
                   left: `${screenPos.x}px`,
                   top: `${screenPos.y}px`,
                 }}
+                onMouseDown={() => setIsNoteClicked(true)}
+                onMouseUp={() => setIsNoteClicked(false)}
+                onMouseLeave={() => setIsNoteClicked(false)}
               >
                 <NoteCard
                   note={note}
@@ -421,29 +421,16 @@ export default function Canvas({ notes, onNoteClick, onCanvasClick, loading = fa
       {/* Position indicator */}
       <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg pointer-events-none z-50">
         <div className="text-sm text-gray-600">
-          x: {Math.round(mouseWorldPos.x)}, y: {Math.round(mouseWorldPos.y)}
-        </div>
-        <div className="text-xs text-gray-400 mt-1">
-          Grid: {Math.floor(mouseWorldPos.x)}, {Math.floor(mouseWorldPos.y)}
-        </div>
-        <div className="text-xs text-gray-400 mt-1">
-          Browser Zoom: {Math.round(viewState.browserZoom * 100)}%
-        </div>
-      </div>
-
-      {/* Note count indicator */}
-      <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg pointer-events-none z-50">
-        <div className="text-sm text-gray-600">
-          {loading ? 'Loading...' : `${notes.length} notes`}
+          x: {Math.floor(mouseWorldPos.x)}, y: {Math.floor(mouseWorldPos.y)}
         </div>
       </div>
 
       {/* Zoom Controls */}
       <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg pointer-events-auto z-50">
-        <div className="flex flex-col gap-1 p-2">
+        <div className="flex flex-col gap-1 p-2 w-fit">
           <button
             onClick={() => zoomToCenter(1.1)}
-            className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-600 font-bold"
+            className="p-1 flex items-center justify-center rounded hover:bg-gray-100 text-gray-600 font-bold"
             title="Zoom In (Ctrl/Cmd + Scroll Up)"
           >
             +
@@ -453,7 +440,7 @@ export default function Canvas({ notes, onNoteClick, onCanvasClick, loading = fa
           </div>
           <button
             onClick={() => zoomToCenter(0.9)}
-            className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-600 font-bold"
+            className="p-1 flex items-center justify-center rounded hover:bg-gray-100 text-gray-600 font-bold"
             title="Zoom Out (Ctrl/Cmd + Scroll Down)"
           >
             -
@@ -465,10 +452,10 @@ export default function Canvas({ notes, onNoteClick, onCanvasClick, loading = fa
               offsetX: 200,
               offsetY: 200
             }))}
-            className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-600 font-bold"
+            className="flex pt-4 pb-2 text-center items-center justify-center rounded hover:bg-gray-100 text-gray-600 font-bold"
             title="Reset Zoom (Ctrl/Cmd + 0)"
           >
-            1:1
+            <RotateCcw className="w-4 h-4" />
           </button>
         </div>
       </div>

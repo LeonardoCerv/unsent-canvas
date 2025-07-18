@@ -6,6 +6,7 @@ export interface Note {
   x: number;
   y: number;
   color?: string;
+  report_count?: number;
 }
 
 export interface CreateNoteData {

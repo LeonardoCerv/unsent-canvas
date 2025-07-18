@@ -3,11 +3,16 @@
 import { useState, useCallback, useEffect } from 'react';
 import Canvas from './Canvas';
 import CreateNoteModal from './CreateNoteModal';
-import NoteCard from './NoteCard';
+
 import SetupGuide from './SetupGuide';
+
 import { useRealtimeCanvas } from '@/hooks/useRealtimeCanvas';
 import { Note, CreateNoteData } from '@/types/note';
 import { getCooldownStatus } from '@/lib/clientCooldown';
+import { moderateContent } from '@/lib/contentModeration';
+import { hasUserReportedNote, recordUserReport } from '@/lib/reportSystem';
+import NoteCard from './NoteCard';
+import { AlertTriangle } from 'lucide-react';
 
 export default function UnsentCanvas() {
   const { notes, loading, sendNote, updateCursor, userId } = useRealtimeCanvas();
@@ -48,6 +53,14 @@ export default function UnsentCanvas() {
   const handleCreateNote = useCallback(async (data: CreateNoteData) => {
     try {
       console.log('Creating note with data:', data);
+      
+      // Apply content moderation before sending
+      const moderationResult = moderateContent(data.message);
+      
+      if (!moderationResult.isAllowed) {
+        throw new Error(`Message blocked: ${moderationResult.reason}`);
+      }
+      
       const result = await sendNote(data);
       console.log('Note created successfully:', result);
       setIsModalOpen(false);
@@ -56,6 +69,42 @@ export default function UnsentCanvas() {
       throw error;
     }
   }, [sendNote]);
+
+  const handleReport = useCallback(async (note: Note) => {
+    // Check if user has already reported this note
+    if (hasUserReportedNote(note.id)) {
+      alert('You have already reported this note.');
+      return;
+    }
+
+    // Record that user reported this note
+    const success = recordUserReport(note.id);
+    if (!success) {
+      alert('Unable to submit report. Please try again.');
+      return;
+    }
+
+    try {
+      // Submit report to backend
+      const response = await fetch(`/api/notes/${note.id}/report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert(`Report submitted successfully. This note now has ${data.reportCount} reports.`);
+        setSelectedNote(null); // Close preview after reporting
+      } else {
+        alert('Failed to submit report. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      alert('Failed to submit report. Please try again.');
+    }
+  }, []);
 
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
@@ -89,14 +138,31 @@ export default function UnsentCanvas() {
       {/* Note preview overlay using the same NoteCard component */}
       {selectedNote && (
         <div 
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          className="fixed inset-0 z-50 flex items-center justify-center"
           onClick={handleClosePreview}
         >
-          <div onClick={(e) => e.stopPropagation()}>
+          <div 
+            className="relative mr-36 mb-128"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Report button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleReport(selectedNote);
+              }}
+              className="relative -top-8 left-18 px-4 rounded-md flex flex-row items-center justify-center text-red-600 transition-colors border-red-500 border"
+              title="Report this note"
+            >
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              Report this Note
+            </button>
+                        
+            {/* Note content */}
             <NoteCard
               note={selectedNote}
               onClick={handleClosePreview}
-              scale={1}
+              scale={10}
               isPreview={true}
             />
           </div>
@@ -122,12 +188,7 @@ export default function UnsentCanvas() {
         </div>
       )}
       
-      {/* Note count indicator */}
-      <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg pointer-events-none z-50">
-        <div className="text-sm text-gray-600">
-          {loading ? 'Loading...' : `${notes.length} notes`}
-        </div>
-      </div>
+
       
     </div>
   );
