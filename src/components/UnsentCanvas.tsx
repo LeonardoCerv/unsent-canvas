@@ -13,6 +13,7 @@ import { moderateContent } from '@/lib/contentModeration';
 import { hasUserReportedNote, recordUserReport } from '@/lib/reportSystem';
 import NoteCard from './NoteCard';
 import { AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function UnsentCanvas() {
   const { notes, loading, sendNote, updateCursor, userId } = useRealtimeCanvas();
@@ -39,6 +40,7 @@ export default function UnsentCanvas() {
     const cooldownStatus = getCooldownStatus();
     if (cooldownStatus.isInCooldown) {
       // Don't show modal if user is on cooldown
+      toast.warning(`Please wait ${cooldownStatus.timeLeftFormatted} before creating another note.`);
       return;
     }
     
@@ -73,36 +75,39 @@ export default function UnsentCanvas() {
   const handleReport = useCallback(async (note: Note) => {
     // Check if user has already reported this note
     if (hasUserReportedNote(note.id)) {
-      alert('You have already reported this note.');
-      return;
-    }
-
-    // Record that user reported this note
-    const success = recordUserReport(note.id);
-    if (!success) {
-      alert('Unable to submit report. Please try again.');
+      toast.warning('You have already reported this note.');
       return;
     }
 
     try {
       // Submit report to backend
-      const response = await fetch(`/api/notes/${note.id}/report`, {
-        method: 'POST',
+      const response = await fetch(`/api/notes`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          id: note.id
+        }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        alert(`Report submitted successfully. This note now has ${data.reportCount} reports.`);
+        toast.success(`Report submitted successfully. This note now has ${data.reportCount} reports.`);
         setSelectedNote(null); // Close preview after reporting
+        
+        // Record that user reported this note
+        const success = recordUserReport(note.id);
+        if (!success) {
+          toast.error('Unable to submit report. Please try again.');
+          return;
+        }
       } else {
-        alert('Failed to submit report. Please try again.');
+        toast.error('Failed to submit report. Please try again.');
       }
     } catch (error) {
       console.error('Error submitting report:', error);
-      alert('Failed to submit report. Please try again.');
+      toast.error('Failed to submit report. Please try again.');
     }
   }, []);
 

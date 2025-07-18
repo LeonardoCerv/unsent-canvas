@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { validateMessage, validateSentTo, LIMITS } from '@/lib/validation';
 import { CreateNoteData } from '@/types/note';
+import { toast } from 'sonner';
 
 interface CreateNoteModalProps {
   isOpen: boolean;
@@ -95,13 +96,18 @@ export default function CreateNoteModal({ isOpen, onClose, onSubmit, x, y, userI
         setMessageErrors([]);
         setSentToErrors([]);
         onClose();
+        
+        // Show success toast
+        toast.success('Note created successfully!');
       } catch (error: unknown) {
         console.error('Error creating note:', error);
         // Show error message to user
         if (error instanceof Error && error.message?.includes('check constraint')) {
           setSentToErrors(['Recipient name is too long']);
+          toast.error('Recipient name is too long');
         } else {
           setSentToErrors(['Failed to create note. Please try again.']);
+          toast.error('Failed to create note. Please try again.');
         }
       }
     }
